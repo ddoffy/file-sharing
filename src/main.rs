@@ -10,10 +10,6 @@ use std::io::Write;
 use serde::Serialize;
 use chrono::{DateTime, Utc};
 use std::time::SystemTime;
-use nix::sys::stat::stat;
-use std::ffi::CStr;
-use std::os::unix::ffi::OsStrExt;
-use std::path::Path;
 
 const UPLOAD_DIR: &str = "./uploads";
 
