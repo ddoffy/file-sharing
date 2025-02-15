@@ -26,9 +26,8 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
     while let Ok(Some(mut field)) = payload.try_next().await {
         if let Some(content_disposition) = field.content_disposition() {
             if let Some(filename) = content_disposition.get_filename() {
+                let filename = format!("{}-{}", Utc::now().timestamp(), filename);
                 let filepath = format!("{}/{}", UPLOAD_DIR, sanitize_filename::sanitize(filename));
-                // add timestamp to filename to avoid overwrite
-                let filepath = format!("{}-{}", Utc::now().timestamp(), filepath);
                 println!("Saving file to: {}", filepath);
 
                 let mut f = File::create(filepath)?;
