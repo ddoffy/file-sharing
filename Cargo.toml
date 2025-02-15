@@ -13,4 +13,5 @@ sanitize-filename = "0.5"
 tokio = { version = "1.43", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 chrono = "0.4.19"
+nix = "0.26"
 

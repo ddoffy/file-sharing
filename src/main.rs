@@ -41,6 +41,27 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().body("Upload successful"))
 }
 
+
+#[cfg(target_os = "linux")]
+fn is_linux() -> bool {
+    true
+}
+
+#[cfg(not(target_os = "linux"))]
+fn is_linux() -> bool {
+    false
+}
+
+#[cfg(target_arch = "aarch64")]
+fn is_jetson() -> bool {
+    true
+}
+
+#[cfg(not(target_arch = "aarch64"))]
+fn is_jetson() -> bool {
+    false
+}
+
 async fn list_files() -> impl Responder {
     let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
     // return a list of files as json format for frontend NextJs
@@ -49,6 +70,17 @@ async fn list_files() -> impl Responder {
         if let Ok(entry) = path {
             let file_name = entry.file_name().into_string().unwrap();
             let created_at = entry.metadata().unwrap().created();
+
+            if is_linux() && is_jetson() {
+                // Jetson Nano has a bug in created time
+                // so we use modified time instead
+                let modified_at = entry.metadata().unwrap().modified();
+                let modified_at = match modified_at {
+                    Ok(time) => time,
+                    Err(_) => std::time::SystemTime::now(),
+                };
+                let created_at = modified_at;
+            }
             
             let created_at = match created_at {
                 Ok(time) => time,
@@ -64,6 +96,8 @@ async fn list_files() -> impl Responder {
             });
         }
     }
+
+    // sort files by created_at
 
     HttpResponse::Ok().json(files)
 }

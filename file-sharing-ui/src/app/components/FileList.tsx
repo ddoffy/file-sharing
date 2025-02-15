@@ -25,7 +25,6 @@ export default function FileList() {
         throw new Error(`Error fetching files: ${res.statusText}`);
       }
       const jsonData = await res.json();
-      console.log("JsonData: ", jsonData);
       const data = jsonData
         .map((item: any) => ({
           filename: item.filename,
@@ -34,7 +33,6 @@ export default function FileList() {
           // Add more fields here if needed
         }))
         .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
-      console.log("Data: ", data);
       setFiles(data);
     } catch (err: any) {
       setError(err.message || "Unknown error");
