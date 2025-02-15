@@ -80,9 +80,7 @@ export default function FileList() {
                   scope="row"
                   className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
                 >
-                  <a
-                    href={`${downloadApi}/${file.filename}`}
-                  >
+                  <a href={`${downloadApi}/${file.filename}`}>
                     {file.filename}
                   </a>
                 </td>
@@ -91,7 +89,10 @@ export default function FileList() {
                   className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
                 >
                   {file.size
-                    ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
+                    ? `${(file.size / 1024 / 1024).toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })} MB`
                     : "-"}
                 </td>
                 <td
