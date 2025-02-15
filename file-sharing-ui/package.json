@@ -19,6 +19,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "babel-plugin-transform-remove-console": "^6.9.4",
     "dotenv": "^16.4.7",
     "env-cmd": "^10.1.0",
     "eslint": "^9",

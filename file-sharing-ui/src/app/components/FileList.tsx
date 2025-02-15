@@ -82,7 +82,6 @@ export default function FileList() {
                 >
                   <a
                     href={`${downloadApi}/${file.filename}`}
-                    style={{ color: "blue" }}
                   >
                     {file.filename}
                   </a>
