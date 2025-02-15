@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io::Write;
 use serde::Serialize;
 use chrono::{DateTime, Utc};
+use std::time::SystemTime;
 
 const UPLOAD_DIR: &str = "./uploads";
 
@@ -70,6 +71,10 @@ async fn list_files() -> impl Responder {
         if let Ok(entry) = path {
             let file_name = entry.file_name().into_string().unwrap();
             let created_at = entry.metadata().unwrap().created();
+            let mut final_created_at: SystemTime = match created_at {
+                Ok(time) => time,
+                Err(_) => SystemTime::now(),
+            };
 
             if is_linux() && is_jetson() {
                 // Jetson Nano has a bug in created time
@@ -80,14 +85,13 @@ async fn list_files() -> impl Responder {
                     Err(_) => std::time::SystemTime::now(),
                 };
                 let created_at = modified_at;
-            }
-            
-            let created_at = match created_at {
-                Ok(time) => time,
-                Err(_) => std::time::SystemTime::now(),
-            };
 
-            let created_at = DateTime::<Utc>::from(created_at);
+                if created_at > final_created_at {
+                    final_created_at = created_at;
+                }
+            }             
+
+            let created_at = DateTime::<Utc>::from(final_created_at);
 
             files.push(FileInfo {
                 filename: file_name,
