@@ -32,7 +32,7 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
             if let Some(filename) = content_disposition.get_filename() {
                 let filepath = format!("{}/{}", UPLOAD_DIR, sanitize_filename::sanitize(filename));
                 // add timestamp to filename to avoid overwrite
-                let filepath = format!("{}-{}", filepath, Utc::now().timestamp());
+                let filepath = format!("{}-{}", Utc::now().timestamp(), filepath);
                 println!("Saving file to: {}", filepath);
 
                 let mut f = File::create(filepath)?;
@@ -47,43 +47,6 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
 }
 
 
-#[cfg(target_os = "linux")]
-fn is_linux() -> bool {
-    true
-}
-
-#[cfg(not(target_os = "linux"))]
-fn is_linux() -> bool {
-    false
-}
-
-#[cfg(target_arch = "aarch64")]
-fn is_jetson() -> bool {
-    true
-}
-
-#[cfg(not(target_arch = "aarch64"))]
-fn is_jetson() -> bool {
-    false
-}
-
-fn get_created_at(p: &str) -> SystemTime {
-    let path = Path::new(p);
-    let c_path = CStr::from_bytes_with_nul(path.as_os_str().as_bytes()).unwrap();
-
-    let created_at = match stat(c_path) {
-        Ok(metadata) => {
-            SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(metadata.st_mtime as u64)
-        },
-        Err(err) => {
-            println!("Error: {:?}", err);
-            SystemTime::now()
-        }
-    };
-
-    created_at
-}
-
 async fn list_files() -> impl Responder {
     let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
     // return a list of files as json format for frontend NextJs
@@ -92,19 +55,13 @@ async fn list_files() -> impl Responder {
         if let Ok(entry) = path {
             let file_name = entry.file_name().into_string().unwrap();
             let created_at = entry.metadata().unwrap().created();
-            let mut final_created_at: SystemTime;
-            if is_linux() && is_jetson() {
-                // Jetson Nano has a bug in created time
-                // so we use modified time instead
-                let path_file = format!("{}/{}", UPLOAD_DIR, file_name);
-                println!("Path: {}", path_file);
-                final_created_at = get_created_at(&path_file);
-            }            
-            else {
-                final_created_at = created_at.unwrap();
-            }
 
-            let created_at = DateTime::<Utc>::from(final_created_at);
+            let created_at = match created_at {
+                Ok(time) => time,
+                Err(_) => SystemTime::now(),
+            };
+
+            let created_at = DateTime::<Utc>::from(created_at);
 
             files.push(FileInfo {
                 filename: file_name,
@@ -114,7 +71,9 @@ async fn list_files() -> impl Responder {
         }
     }
 
-    // sort files by created_at
+    // sort files by filename, cuz prefix of filename is timestamp
+    // descending order
+    files.sort_by(|a, b| b.filename.cmp(&a.filename));
 
     HttpResponse::Ok().json(files)
 }
