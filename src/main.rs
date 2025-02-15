@@ -226,9 +226,14 @@ async fn list_files() -> impl Responder {
     for path in paths {
         if let Ok(entry) = path {
             let file_name = entry.file_name().into_string().unwrap();
-            let created_at = entry.metadata().unwrap().created().unwrap();
-            let created_at = DateTime::<Utc>::from(created_at);
+            let created_at = entry.metadata().unwrap().created();
+            
+            let created_at = match created_at {
+                Ok(time) => time,
+                Err(_) => std::time::SystemTime::now(),
+            };
 
+            let created_at = DateTime::<Utc>::from(created_at);
 
             files.push(FileInfo {
                 filename: file_name,
