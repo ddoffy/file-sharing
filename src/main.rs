@@ -96,7 +96,9 @@ async fn list_files() -> impl Responder {
             if is_linux() && is_jetson() {
                 // Jetson Nano has a bug in created time
                 // so we use modified time instead
-                final_created_at = get_created_at(entry.path().to_str().unwrap());
+                let path_file = format!("{}/{}", UPLOAD_DIR, file_name);
+                println!("Path: {}", path_file);
+                final_created_at = get_created_at(&path_file);
             }            
             else {
                 final_created_at = created_at.unwrap();
