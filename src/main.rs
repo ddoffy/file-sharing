@@ -68,7 +68,7 @@ async fn list_files() -> impl Responder {
 
     // sort files by filename, cuz prefix of filename is timestamp
     // descending order
-    files.sort_by(|a, b| b.filename.cmp(&a.filename));
+    files.sort_by(|a, b| a.filename.cmp(&b.filename));
 
     HttpResponse::Ok().json(files)
 }

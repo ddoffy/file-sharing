@@ -31,8 +31,7 @@ export default function FileList() {
           size: item.size,
           createdAt: item.created_at,
           // Add more fields here if needed
-        }))
-        .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+        }));
       setFiles(data);
     } catch (err: any) {
       setError(err.message || "Unknown error");
