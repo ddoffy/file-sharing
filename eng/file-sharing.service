@@ -1,0 +1,11 @@
+[Unit]
+Description=Rust File Sharing Service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

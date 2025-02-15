@@ -39,6 +39,20 @@ async fn index(_req: HttpRequest) -> impl Responder {
         #message {
             color: green;
         }
+        .file-progress-container {
+          margin-top: 1rem;
+          border: 1px solid #ccc;
+          padding: 5px;
+          border-radius: 4px;
+          margin-bottom: 1rem;
+        }
+        .progress-bar {
+          width: 0%;
+          height: 20px;
+          background-color: #4caf50;
+          border-radius: 3px;
+          transition: width 0.2s;
+        }
     </style>
 </head>
 <body>
@@ -46,6 +60,11 @@ async fn index(_req: HttpRequest) -> impl Responder {
     <div id="drop_zone">Kéo và thả file vào đây</div>
     
     <p id="message"></p>
+
+    <!-- Container để hiển thị progress cho từng file -->
+    <div id="progressContainer"></div>
+    <div id="status"></div>
+
     <button onclick="window.location.href='/files'">Xem danh sách file</button>
     <script>
         const dropZone = document.getElementById('drop_zone');
@@ -83,24 +102,78 @@ async fn index(_req: HttpRequest) -> impl Responder {
             let dt = e.dataTransfer;
             let files = dt.files;
 
-            // Tạo form data
-            let formData = new FormData();
-            for (let i = 0; i < files.length; i++) {
-                formData.append("file", files[i]);
-            }
+            // Xóa progress cũ nếu có
+            document.getElementById('progressContainer').innerHTML = '';
+            document.getElementById('status').innerText = '';
 
-            // Gửi request upload
-            fetch("/upload", {
-                method: "POST",
-                body: formData
-            })
-            .then(response => response.text())
-            .then(data => {
-                message.innerText = data; // Hiển thị thông báo
-            })
-            .catch(error => {
-                message.innerText = "Lỗi khi upload: " + error;
-            });
+            //// Tạo form data
+            //let formData = new FormData();
+            //for (let i = 0; i < files.length; i++) {
+            //    formData.append("file", files[i]);
+            //}
+
+            //// Gửi request upload
+            //fetch("/upload", {
+            //    method: "POST",
+            //    body: formData
+            //})
+            //.then(response => response.text())
+            //.then(data => {
+            //    message.innerText = data; // Hiển thị thông báo
+            //})
+            //.catch(error => {
+            //    message.innerText = "Lỗi khi upload: " + error;
+            //});
+
+              // Lặp qua từng file và gửi từng file một
+            for (var i = 0; i < files.length; i++) {
+              (function(file) {
+                // Tạo container hiển thị progress cho file hiện tại
+                var container = document.createElement('div');
+                container.classList.add('file-progress-container');
+
+                var fileName = document.createElement('div');
+                fileName.innerText = file.name;
+                container.appendChild(fileName);
+
+                var progressBar = document.createElement('div');
+                progressBar.classList.add('progress-bar');
+                container.appendChild(progressBar);
+
+                // Thêm container vào div chứa progress
+                document.getElementById('progressContainer').appendChild(container);
+
+                // Tạo FormData cho file hiện tại
+                var formData = new FormData();
+                formData.append("file", file);
+
+                // Tạo XMLHttpRequest mới cho file này
+                var xhr = new XMLHttpRequest();
+                xhr.open("POST", "/upload", true);
+
+                // Sự kiện progress cho upload
+                xhr.upload.onprogress = function(e) {
+                  if (e.lengthComputable) {
+                    var percentComplete = (e.loaded / e.total) * 100;
+                    progressBar.style.width = percentComplete + '%';
+                  }
+                };
+
+                xhr.onload = function() {
+                  if (xhr.status === 200) {
+                    fileName.innerText += " - Upload thành công!";
+                  } else {
+                    fileName.innerText += " - Upload thất bại: " + xhr.status;
+                  }
+                };
+
+                xhr.onerror = function() {
+                  fileName.innerText += " - Lỗi khi upload.";
+                };
+
+                xhr.send(formData);
+              })(files[i]);
+            }
         }
     </script>
 </body>
