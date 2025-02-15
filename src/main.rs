@@ -81,13 +81,6 @@ async fn download_file(req: HttpRequest,
     }
 }
 
-async fn fallback() -> impl Responder {
-    // You can load the content of index.html from disk or include it at compile time
-    HttpResponse::Ok()
-        .content_type("text/html")
-        .body(include_str!("../file-sharing-ui/out/index.html"))
-}
-
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
@@ -98,7 +91,6 @@ async fn main() -> std::io::Result<()> {
             .route("/api/files", web::get().to(list_files))
             .route("/api/download/{filename}", web::get().to(download_file))
             .service(Files::new("/", "./file-sharing-ui/out").index_file("index.html"))
-            .default_service(web::route().to(fallback))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
