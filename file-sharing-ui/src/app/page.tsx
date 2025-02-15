@@ -6,8 +6,7 @@ import DragDropUploader from "./components/DragDropUploader";
 export default function Home() {
   const [progresses, setProgresses] = useState([]);
   const [statuses, setStatuses] = useState([]);
-
-  const fileServerApi = process.env.FILE_SERVER_API || "";
+  const uploadApi =  (process.env.FILE_SERVER_API || "") + "/api/upload";
 
   const handleFiles = (files: FileList) => {
     // handle the files (e.g. upload to a server)
@@ -26,7 +25,7 @@ export default function Home() {
 
     const xhr = new XMLHttpRequest();
 
-    xhr.open("POST", `${fileServerApi}/api/upload`, true);
+    xhr.open("POST", uploadApi, true);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {

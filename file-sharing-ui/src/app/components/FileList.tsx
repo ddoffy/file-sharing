@@ -13,13 +13,14 @@ export default function FileList() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fileServerApi = process.env.FILE_SERVER_API || "";
+  let listFilesApi = (process.env.FILE_SERVER_API || "") + "/api/files";
+  let downloadApi = (process.env.FILE_SERVER_API || "") + "/api/download";
 
   async function fetchFiles() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${fileServerApi}/api/files`); // Adjust this URL to match your API endpoint.
+      const res = await fetch(listFilesApi); // Adjust this URL to match your API endpoint.
       if (!res.ok) {
         throw new Error(`Error fetching files: ${res.statusText}`);
       }
@@ -58,28 +59,46 @@ export default function FileList() {
         <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
-              <th scope="col" className="px-6 py-3">File Name</th>
-              <th scope="col" className="px-6 py-3">Size</th>
-              <th scope="col" className="px-6 py-3">Created At</th>
+              <th scope="col" className="px-6 py-3">
+                File Name
+              </th>
+              <th scope="col" className="px-6 py-3">
+                Size
+              </th>
+              <th scope="col" className="px-6 py-3">
+                Created At
+              </th>
             </tr>
           </thead>
           <tbody>
             {files.map((file) => (
-              <tr key={file.filename} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200">
-                <td scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+              <tr
+                key={file.filename}
+                className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200"
+              >
+                <td
+                  scope="row"
+                  className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                >
                   <a
-                    href={`${fileServerApi}/api/download/${file.filename}`}
+                    href={`${downloadApi}/${file.filename}`}
                     style={{ color: "blue" }}
                   >
                     {file.filename}
                   </a>
                 </td>
-                <td scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                <td
+                  scope="row"
+                  className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                >
                   {file.size
                     ? `${(file.size / 1024 / 1024).toFixed(2)} MB`
                     : "-"}
                 </td>
-                <td scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white">
+                <td
+                  scope="row"
+                  className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                >
                   {file.createdAt
                     ? new Date(file.createdAt).toLocaleString()
                     : "-"}

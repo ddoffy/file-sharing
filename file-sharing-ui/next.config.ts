@@ -8,6 +8,8 @@ import * as path from "path";
 const envFile = process.env.NEXT_ENV_FILE || ".env";
 const envPath = path.resolve(process.cwd(), envFile);
 
+console.log("Loading environment from: ", envPath);
+
 if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }

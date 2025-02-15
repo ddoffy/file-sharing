@@ -4,7 +4,7 @@ import { useState } from "react";
 export default function FileUploader() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("");
-  const fileServerApi = process.env.FILE_SERVER_API || "";
+  const uploadApi = (process.env.FILE_SERVER_API || "") + "/api/upload";
 
   const handleUpload = async (e) => {
     const files = e.target.files;
@@ -22,7 +22,7 @@ export default function FileUploader() {
 
     const xhr = new XMLHttpRequest();
 
-    xhr.open("POST", `${fileServerApi}/api/upload`, true);
+    xhr.open("POST", uploadApi, true);
 
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
