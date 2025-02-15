@@ -3,11 +3,23 @@ use actix_multipart::Multipart;
 use actix_web::{
     web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder
 };
+use actix_cors::Cors;
 use futures_util::TryStreamExt as _;
 use std::fs::File;
 use std::io::Write;
+use serde::Serialize;
+use std::time::{SystemTime, UNIX_EPOCH};
+use chrono::{DateTime, Utc};
+
 
 const UPLOAD_DIR: &str = "./uploads";
+
+#[derive(Debug, Serialize)]
+struct FileInfo {
+    filename: String,
+    size: u64,
+    created_at: String,
+}
 
 /// Trang HTML hỗ trợ kéo-thả file
 async fn index(_req: HttpRequest) -> impl Responder {
@@ -208,25 +220,27 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().body("Tải file thành công!"))
 }
 
-/// Liệt kê file đã upload
+// Liệt kê file đã upload
 async fn list_files() -> impl Responder {
     let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
-    let mut html_list = String::new();
-
-    html_list.push_str("<h1>Danh sách file</h1><ul>");
+    // return a list of files as json format for frontend NextJs
+    let mut files = Vec::new();
     for path in paths {
         if let Ok(entry) = path {
             let file_name = entry.file_name().into_string().unwrap();
-            html_list.push_str(&format!(
-                "<li><a href=\"/download/{}\">{}</a></li>",
-                file_name, file_name
-            ));
+            let created_at = entry.metadata().unwrap().created().unwrap();
+            let created_at = DateTime::<Utc>::from(created_at);
+
+
+            files.push(FileInfo {
+                filename: file_name,
+                size: entry.metadata().unwrap().len(),
+                created_at: created_at.to_rfc3339(),
+            });
         }
     }
-    html_list.push_str("</ul>");
-    html_list.push_str("<br><a href=\"/\">Quay lại trang Kéo-Thả</a>");
 
-    HttpResponse::Ok().content_type("text/html").body(html_list)
+    HttpResponse::Ok().json(files)
 }
 
 /// Tải file xuống
@@ -248,10 +262,12 @@ async fn main() -> std::io::Result<()> {
     // Chạy server
     HttpServer::new(|| {
         App::new()
-            .route("/", web::get().to(index))
-            .route("/upload", web::post().to(upload_file))
-            .route("/files", web::get().to(list_files))
-            .route("/download/{filename}", web::get().to(download_file))
+            .wrap(Cors::default().allow_any_origin().allow_any_header().allow_any_method())
+            // home page as static page index html
+            .route("/api/upload", web::post().to(upload_file))
+            .route("/api/files", web::get().to(list_files))
+            .route("/api/download/{filename}", web::get().to(download_file))
+            .service(Files::new("/", "./file-sharing-ui/out").index_file("index.html"))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
