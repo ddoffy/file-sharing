@@ -10,6 +10,10 @@ use std::io::Write;
 use serde::Serialize;
 use chrono::{DateTime, Utc};
 use std::time::SystemTime;
+use nix::sys::stat::stat;
+use std::ffi::CStr;
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
 
 const UPLOAD_DIR: &str = "./uploads";
 
@@ -63,6 +67,23 @@ fn is_jetson() -> bool {
     false
 }
 
+fn get_created_at(p: &str) -> SystemTime {
+    let path = Path::new(p);
+    let c_path = CStr::from_bytes_with_nul(path.as_os_str().as_bytes()).unwrap();
+
+    let created_at = match stat(c_path) {
+        Ok(metadata) => {
+            SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(metadata.st_mtime as u64)
+        },
+        Err(err) => {
+            println!("Error: {:?}", err);
+            SystemTime::now()
+        }
+    };
+
+    created_at
+}
+
 async fn list_files() -> impl Responder {
     let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
     // return a list of files as json format for frontend NextJs
@@ -71,25 +92,15 @@ async fn list_files() -> impl Responder {
         if let Ok(entry) = path {
             let file_name = entry.file_name().into_string().unwrap();
             let created_at = entry.metadata().unwrap().created();
-            let mut final_created_at: SystemTime = match created_at {
-                Ok(time) => time,
-                Err(_) => SystemTime::now(),
-            };
-
+            let mut final_created_at: SystemTime;
             if is_linux() && is_jetson() {
                 // Jetson Nano has a bug in created time
                 // so we use modified time instead
-                let modified_at = entry.metadata().unwrap().modified();
-                let modified_at = match modified_at {
-                    Ok(time) => time,
-                    Err(_) => std::time::SystemTime::now(),
-                };
-                let created_at = modified_at;
-
-                if created_at > final_created_at {
-                    final_created_at = created_at;
-                }
-            }             
+                final_created_at = get_created_at(entry.path().to_str().unwrap());
+            }            
+            else {
+                final_created_at = created_at.unwrap();
+            }
 
             let created_at = DateTime::<Utc>::from(final_created_at);
 
