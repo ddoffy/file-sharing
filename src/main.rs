@@ -1,4 +1,4 @@
-use actix_files::{Files, NamedFile};
+use actix_files::{NamedFile};
 use actix_multipart::Multipart;
 use actix_web::{
     web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder
@@ -91,11 +91,9 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
             .wrap(Cors::default().allow_any_origin().allow_any_header().allow_any_method())
-            // home page as static page index html
             .route("/api/upload", web::post().to(upload_file))
             .route("/api/files", web::get().to(list_files))
             .route("/api/download/{filename}", web::get().to(download_file))
-            .service(Files::new("/", "./file-sharing-ui/out").index_file("index.html"))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
