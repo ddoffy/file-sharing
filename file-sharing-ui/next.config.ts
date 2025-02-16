@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
 
   // distDir: "dist",
   // output: "export", -- we run it separately
-  swcMinify: true, // Enable SWC minification
+  // swcMinify: true, // Enable SWC minification - this is invalid settings
   compiler: {
     // Remove all console.* calls in production
     removeConsole: true,
@@ -43,7 +43,7 @@ const nextConfig: NextConfig = {
   env: {
     FILE_SERVER_API: process.env.FILE_SERVER_API || "/",
   },
-  rewrite: async () => {
+  rewrites: async () => {
     return [
       {
         source: "/",
