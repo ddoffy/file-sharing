@@ -86,11 +86,16 @@ async fn download_file(req: HttpRequest,
     }
 }
 
+async fn index() -> impl Responder {
+    HttpResponse::Ok().body("Welcome to File Upload API")
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
             .wrap(Cors::default().allow_any_origin().allow_any_header().allow_any_method())
+            .route("/", web::get().to(index))
             .route("/api/upload", web::post().to(upload_file))
             .route("/api/files", web::get().to(list_files))
             .route("/api/download/{filename}", web::get().to(download_file))
