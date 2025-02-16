@@ -34,7 +34,7 @@ const nextConfig: NextConfig = {
   },
 
   // distDir: "dist",
-  output: "export",
+  // output: "export", -- we run it separately
   swcMinify: true, // Enable SWC minification
   compiler: {
     // Remove all console.* calls in production
