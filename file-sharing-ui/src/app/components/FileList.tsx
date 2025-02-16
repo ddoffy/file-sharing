@@ -13,8 +13,8 @@ export default function FileList() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  let listFilesApi = (process.env.FILE_SERVER_API || "") + "/api/files";
-  let downloadApi = (process.env.FILE_SERVER_API || "") + "/api/download";
+  const listFilesApi = (process.env.FILE_SERVER_API || "") + "/api/files";
+  const downloadApi = (process.env.FILE_SERVER_API || "") + "/api/download";
 
   async function fetchFiles() {
     setLoading(true);
@@ -25,13 +25,12 @@ export default function FileList() {
         throw new Error(`Error fetching files: ${res.statusText}`);
       }
       const jsonData = await res.json();
-      const data = jsonData
-        .map((item: any) => ({
-          filename: item.filename,
-          size: item.size,
-          createdAt: item.created_at,
-          // Add more fields here if needed
-        }));
+      const data = jsonData.map((item: any) => ({
+        filename: item.filename,
+        size: item.size,
+        createdAt: item.created_at,
+        // Add more fields here if needed
+      }));
       setFiles(data);
     } catch (err: any) {
       setError(err.message || "Unknown error");
@@ -53,57 +52,59 @@ export default function FileList() {
       {files.length === 0 && !loading ? (
         <p>No files uploaded yet.</p>
       ) : (
-        <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-          <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-            <tr>
-              <th scope="col" className="px-6 py-3">
-                File Name
-              </th>
-              <th scope="col" className="px-6 py-3">
-                Size
-              </th>
-              <th scope="col" className="px-6 py-3">
-                Created At
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {files.map((file) => (
-              <tr
-                key={file.filename}
-                className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200"
-              >
-                <td
-                  scope="row"
-                  className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-                >
-                  <a href={`${downloadApi}/${file.filename}`}>
-                    {file.filename}
-                  </a>
-                </td>
-                <td
-                  scope="row"
-                  className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-                >
-                  {file.size
-                    ? `${(file.size / 1024 / 1024).toLocaleString(undefined, {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })} MB`
-                    : "-"}
-                </td>
-                <td
-                  scope="row"
-                  className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
-                >
-                  {file.createdAt
-                    ? new Date(file.createdAt).toLocaleString()
-                    : "-"}
-                </td>
+        <div className="w-full overflow-x-auto">
+          <table className="min-w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+              <tr>
+                <th scope="col" className="px-4 py-2 md:px-6 md:py-3">
+                  File Name
+                </th>
+                <th scope="col" className="px-4 py-2 md:px-6 md:py-3">
+                  Size
+                </th>
+                <th scope="col" className="px-4 py-2 md:px-6 md:py-3">
+                  Created At
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {files.map((file) => (
+                <tr
+                  key={file.filename}
+                  className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 border-gray-200"
+                >
+                  <td
+                    scope="row"
+                    className="px-4 py-2 md:px-6 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                  >
+                    <a href={`${downloadApi}/${file.filename}`}>
+                      {file.filename}
+                    </a>
+                  </td>
+                  <td
+                    scope="row"
+                    className="px-4 py-2 md:px-6 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                  >
+                    {file.size
+                      ? `${(file.size / 1024 / 1024).toLocaleString(undefined, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })} MB`
+                      : "-"}
+                  </td>
+                  <td
+                    scope="row"
+                    className="px-4 py-2 md:px-6 md:py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"
+                  >
+                    {file.createdAt
+                      ? new Date(file.createdAt).toLocaleString()
+                      : "-"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
       <button
         onClick={fetchFiles}

@@ -43,6 +43,18 @@ const nextConfig: NextConfig = {
   env: {
     FILE_SERVER_API: process.env.FILE_SERVER_API || "/",
   },
+  rewrite: async () => {
+    return [
+      {
+        source: "/",
+        destination: "/",
+      },
+      {
+        source: "/file-list",
+        destination: "/file-list",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

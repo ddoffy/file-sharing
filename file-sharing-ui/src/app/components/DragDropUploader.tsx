@@ -44,7 +44,7 @@ export default function DragDropUploader ({ onFilesSelected }) {
   };
 
   return (
-    <div>
+    <div className="w-full overflow-x-auto">
       <div
         onDragEnter={handleDragEnter}
         onDragLeave={handleDragLeave}
