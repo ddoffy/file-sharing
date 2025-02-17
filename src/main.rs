@@ -1,14 +1,13 @@
-use actix_files::{NamedFile};
-use actix_multipart::Multipart;
-use actix_web::{
-    web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder
-};
 use actix_cors::Cors;
+use actix_files::NamedFile;
+use actix_multipart::Multipart;
+use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt as _;
+use serde::{Serialize, Deserialize};
 use std::fs::File;
 use std::io::Write;
-use serde::Serialize;
-use chrono::{DateTime, Utc};
+use std::process::Command;
 use std::time::SystemTime;
 
 const UPLOAD_DIR: &str = "./uploads";
@@ -18,6 +17,12 @@ struct FileInfo {
     filename: String,
     size: u64,
     created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct SearchQuery {
+    filename: String,
+    extensions: Option<Vec<String>>,
 }
 
 async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
@@ -41,6 +46,18 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
     Ok(HttpResponse::Ok().body("Upload successful"))
 }
 
+fn get_created_at(file: &str) -> String {
+    let created_at = std::fs::metadata(file).unwrap().created();
+
+    let created_at = match created_at {
+        Ok(time) => time,
+        Err(_) => SystemTime::now(),
+    };
+
+    let created_at = DateTime::<Utc>::from(created_at);
+
+    created_at.to_rfc3339()
+}
 
 async fn list_files() -> impl Responder {
     let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
@@ -73,14 +90,58 @@ async fn list_files() -> impl Responder {
     HttpResponse::Ok().json(files)
 }
 
-async fn download_file(req: HttpRequest,
-    path: web::Path<String>) -> impl Responder {
+async fn download_file(req: HttpRequest, path: web::Path<String>) -> impl Responder {
     let filepath = format!("{}/{}", UPLOAD_DIR, path.into_inner());
     if std::path::Path::new(&filepath).exists() {
         match NamedFile::open_async(filepath).await {
             Ok(named_file) => named_file.into_response(&req),
             Err(_) => HttpResponse::NotFound().body("File not found."),
         }
+    } else {
+        HttpResponse::NotFound().body("File not found.")
+    }
+}
+
+async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
+    // use find-fd to search files
+    let mut args: Vec<String> = Vec::new();
+
+    // build arguments for fd command
+    if query.extensions.is_some() {
+        for ext in query.extensions.iter().flatten() {
+            args.push("-e".to_string());
+            args.push(ext.to_string());
+        }
+    }
+
+    args.push(query.filename.clone());
+    args.push(UPLOAD_DIR.to_string());
+
+    let output = Command::new("fd")
+        .args(args)
+        .output();
+
+    if let Ok(out) = output {
+        let stdout = String::from_utf8_lossy(&out.stdout);
+        let files: Vec<&str> = stdout.split("\n").collect();
+        let mut file_infos = Vec::new();
+
+        for file in files {
+            if file.len() > 0 {
+                let created_at = get_created_at(file);
+                file_infos.push(FileInfo {
+                    filename: file.replace(UPLOAD_DIR, "").replace("/", "").to_string(),
+                    size: std::fs::metadata(file).unwrap().len(),
+                    created_at,
+                });
+            }
+        }
+        
+        // sort files by filename, cuz prefix of filename is timestamp
+        // descending order
+        file_infos.sort_by(|a, b| b.filename.cmp(&a.filename));
+
+        HttpResponse::Ok().json(file_infos)
     } else {
         HttpResponse::NotFound().body("File not found.")
     }
@@ -94,11 +155,17 @@ async fn index() -> impl Responder {
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
-            .wrap(Cors::default().allow_any_origin().allow_any_header().allow_any_method())
+            .wrap(
+                Cors::default()
+                    .allow_any_origin()
+                    .allow_any_header()
+                    .allow_any_method(),
+            )
             .route("/", web::get().to(index))
             .route("/api/upload", web::post().to(upload_file))
             .route("/api/files", web::get().to(list_files))
             .route("/api/download/{filename}", web::get().to(download_file))
+            .route("/api/search", web::post().to(search_files))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
