@@ -9,6 +9,12 @@ use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 use std::time::SystemTime;
+use crate::config::init_config;
+
+pub mod db;
+pub mod config;
+pub mod api;
+
 
 const UPLOAD_DIR: &str = "./uploads";
 
@@ -166,6 +172,9 @@ async fn index() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // set up services
+    init_config();
+
     HttpServer::new(|| {
         App::new()
             .wrap(
@@ -178,6 +187,9 @@ async fn main() -> std::io::Result<()> {
             .route("/api/upload", web::post().to(upload_file))
             .route("/api/download/{filename}", web::get().to(download_file))
             .route("/api/search", web::post().to(search_files))
+            .route("/api/v1/clipboard/{room_id}/store", web::post().to(api::v1::clipboard::clipboard::store_clipboard))
+            .route("/api/v1/clipboard/keys", web::get().to(api::v1::clipboard::clipboard::get_clipboard_keys))
+            .route("/api/v1/clipboard/{room_id}/get", web::get().to(api::v1::clipboard::clipboard::get_clipboard))
     })
     .bind(("0.0.0.0", 8080))?
     .run()
