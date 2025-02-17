@@ -23,6 +23,19 @@ struct FileInfo {
 struct SearchQuery {
     filename: String,
     extensions: Option<Vec<String>>,
+    page: usize,
+    limit: usize,
+}
+
+impl Default for SearchQuery {
+    fn default() -> Self {
+        SearchQuery {
+            filename: "".to_string(),
+            extensions: None,
+            page: 0,
+            limit: 100
+        }
+    }
 }
 
 async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
@@ -59,36 +72,36 @@ fn get_created_at(file: &str) -> String {
     created_at.to_rfc3339()
 }
 
-async fn list_files() -> impl Responder {
-    let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
-    // return a list of files as json format for frontend NextJs
-    let mut files = Vec::new();
-    for path in paths {
-        if let Ok(entry) = path {
-            let file_name = entry.file_name().into_string().unwrap();
-            let created_at = entry.metadata().unwrap().created();
-
-            let created_at = match created_at {
-                Ok(time) => time,
-                Err(_) => SystemTime::now(),
-            };
-
-            let created_at = DateTime::<Utc>::from(created_at);
-
-            files.push(FileInfo {
-                filename: file_name,
-                size: entry.metadata().unwrap().len(),
-                created_at: created_at.to_rfc3339(),
-            });
-        }
-    }
-
-    // sort files by filename, cuz prefix of filename is timestamp
-    // descending order
-    files.sort_by(|a, b| b.filename.cmp(&a.filename));
-
-    HttpResponse::Ok().json(files)
-}
+//async fn list_files(request: web::Json<Pagination>) -> impl Responder {
+//    let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
+//    // return a list of files as json format for frontend NextJs
+//    let mut files = Vec::new();
+//    for path in paths {
+//        if let Ok(entry) = path {
+//            let file_name = entry.file_name().into_string().unwrap();
+//            let created_at = entry.metadata().unwrap().created();
+//
+//            let created_at = match created_at {
+//                Ok(time) => time,
+//                Err(_) => SystemTime::now(),
+//            };
+//
+//            let created_at = DateTime::<Utc>::from(created_at);
+//
+//            files.push(FileInfo {
+//                filename: file_name,
+//                size: entry.metadata().unwrap().len(),
+//                created_at: created_at.to_rfc3339(),
+//            });
+//        }
+//    }
+//
+//    // sort files by filename, cuz prefix of filename is timestamp
+//    // descending order
+//    files.sort_by(|a, b| b.filename.cmp(&a.filename));
+//
+//    HttpResponse::Ok().json(files.iter().skip(request.page * request.limit).take(request.limit).collect::<Vec<&FileInfo>>())
+//}
 
 async fn download_file(req: HttpRequest, path: web::Path<String>) -> impl Responder {
     let filepath = format!("{}/{}", UPLOAD_DIR, path.into_inner());
@@ -141,7 +154,7 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
         // descending order
         file_infos.sort_by(|a, b| b.filename.cmp(&a.filename));
 
-        HttpResponse::Ok().json(file_infos)
+        HttpResponse::Ok().json(file_infos.iter().skip(query.page * query.limit).take(query.limit).collect::<Vec<&FileInfo>>())
     } else {
         HttpResponse::NotFound().body("File not found.")
     }
@@ -163,7 +176,6 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(index))
             .route("/api/upload", web::post().to(upload_file))
-            .route("/api/files", web::get().to(list_files))
             .route("/api/download/{filename}", web::get().to(download_file))
             .route("/api/search", web::post().to(search_files))
     })
