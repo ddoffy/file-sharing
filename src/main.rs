@@ -1,7 +1,7 @@
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
-use actix_web::{web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{web, middleware, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt as _;
 use serde::{Serialize, Deserialize};
@@ -10,11 +10,12 @@ use std::io::Write;
 use std::process::Command;
 use std::time::SystemTime;
 use crate::config::init_config;
+use tokio::sync::broadcast;
 
 pub mod db;
 pub mod config;
 pub mod api;
-
+pub mod ws;
 
 const UPLOAD_DIR: &str = "./uploads";
 
@@ -172,10 +173,17 @@ async fn index() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // init logger
+    env_logger::init_from_env(env_logger::Env::new().default_filter_or("info"));
+
+    log::info!("Starting server at http://localhost:8080");
+
     // set up services
     init_config();
 
-    HttpServer::new(|| {
+    let (tx, _) = broadcast::channel::<web::Bytes>(128);
+
+    HttpServer::new(move || {
         App::new()
             .wrap(
                 Cors::default()
@@ -190,6 +198,13 @@ async fn main() -> std::io::Result<()> {
             .route("/api/v1/clipboard/{room_id}/store", web::post().to(api::v1::clipboard::clipboard::store_clipboard))
             .route("/api/v1/clipboard/keys", web::get().to(api::v1::clipboard::clipboard::get_clipboard_keys))
             .route("/api/v1/clipboard/{room_id}/get", web::get().to(api::v1::clipboard::clipboard::get_clipboard))
+            .route("/ws", web::get().to(ws::ws_handler))
+            .app_data(web::Data::new(tx.clone()))
+            .service(web::resource("/ws-broadcast").route(web::get().to(ws::handshake_and_start_broadcast_ws)))
+            .service(web::resource("/send").route(web::post().to(ws::send_to_broadcast_ws)))
+            // standard middleware
+            .wrap(middleware::NormalizePath::trim())
+            .wrap(middleware::Logger::default())
     })
     .bind(("0.0.0.0", 8080))?
     .run()

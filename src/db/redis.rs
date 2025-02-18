@@ -1,4 +1,4 @@
-use deadpool_redis::{Connection, Config, Runtime, Pool};
+use deadpool_redis::{Config, Connection, Pool, Runtime};
 use once_cell::sync::OnceCell;
 
 pub static REDIS_POOL: OnceCell<Pool> = OnceCell::new();
@@ -27,7 +27,11 @@ pub fn get_cfg() -> RedisConfig {
     }
 }
 
+pub fn get_pool() -> Pool {
+    REDIS_POOL.get().unwrap().clone()
+}
+
 pub async fn get_redis_conn() -> Connection {
-    let pool = REDIS_POOL.get().unwrap();
+    let pool = get_pool();
     pool.get().await.unwrap()
 }
