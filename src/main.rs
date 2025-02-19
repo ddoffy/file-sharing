@@ -1,20 +1,21 @@
+use crate::config::init_config;
 use actix_cors::Cors;
 use actix_files::NamedFile;
 use actix_multipart::Multipart;
-use actix_web::{web, middleware, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{middleware, web, App, Error, HttpRequest, HttpResponse, HttpServer, Responder};
 use chrono::{DateTime, Utc};
 use futures_util::TryStreamExt as _;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Write;
 use std::process::Command;
 use std::time::SystemTime;
-use crate::config::init_config;
+use tokio::fs;
 use tokio::sync::broadcast;
 
-pub mod db;
-pub mod config;
 pub mod api;
+pub mod config;
+pub mod db;
 pub mod ws;
 
 const UPLOAD_DIR: &str = "./uploads";
@@ -40,18 +41,20 @@ impl Default for SearchQuery {
             filename: "".to_string(),
             extensions: None,
             page: 0,
-            limit: 100
+            limit: 100,
         }
     }
 }
 
-async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
+async fn upload_file(req: HttpRequest, mut payload: Multipart) -> Result<HttpResponse, Error> {
     std::fs::create_dir_all(UPLOAD_DIR).unwrap();
+
+    let mut final_filename = String::new();
 
     while let Ok(Some(mut field)) = payload.try_next().await {
         if let Some(content_disposition) = field.content_disposition() {
             if let Some(filename) = content_disposition.get_filename() {
-                let filename = format!("{}-{}", Utc::now().timestamp(), filename);
+                final_filename = format!("{}-{}", Utc::now().timestamp(), filename);
                 let filepath = format!("{}/{}", UPLOAD_DIR, sanitize_filename::sanitize(filename));
                 println!("Saving file to: {}", filepath);
 
@@ -63,7 +66,37 @@ async fn upload_file(mut payload: Multipart) -> Result<HttpResponse, Error> {
         }
     }
 
-    Ok(HttpResponse::Ok().body("Upload successful"))
+    let host = req.connection_info().host().to_string();
+
+    Ok(HttpResponse::Ok().body(format!("{}/api/download/{}", host, final_filename)))
+}
+
+// upload file to the server with binary data
+async fn upload_file_binary(req: HttpRequest, body: web::Bytes) -> impl Responder {
+    // Extract filename from "X-Filename" header
+    let filename = req
+        .headers()
+        .get("x-filename")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or(format!("{}.unknown.bin", Utc::now().timestamp()).as_str())
+        .to_string();
+
+    // log out all headers
+    println!("Headers: {:?}", req.headers());
+
+    let filename = format!("{}-{}", Utc::now().timestamp(), filename);
+    let filepath = format!("{}/{}", UPLOAD_DIR, sanitize_filename::sanitize(filename.clone()));
+    println!("Saving file to: {}", filepath);
+
+    // Create directory if not exists
+    fs::create_dir_all(UPLOAD_DIR).await.unwrap();
+
+    let mut f = File::create(filepath).unwrap();
+    f.write_all(&body).unwrap();
+
+    // return url to download the file
+    let host = req.connection_info().host().to_string();
+    HttpResponse::Ok().body(format!("{}/api/download/{}",host, filename))
 }
 
 fn get_created_at(file: &str) -> String {
@@ -78,37 +111,6 @@ fn get_created_at(file: &str) -> String {
 
     created_at.to_rfc3339()
 }
-
-//async fn list_files(request: web::Json<Pagination>) -> impl Responder {
-//    let paths = std::fs::read_dir(UPLOAD_DIR).unwrap();
-//    // return a list of files as json format for frontend NextJs
-//    let mut files = Vec::new();
-//    for path in paths {
-//        if let Ok(entry) = path {
-//            let file_name = entry.file_name().into_string().unwrap();
-//            let created_at = entry.metadata().unwrap().created();
-//
-//            let created_at = match created_at {
-//                Ok(time) => time,
-//                Err(_) => SystemTime::now(),
-//            };
-//
-//            let created_at = DateTime::<Utc>::from(created_at);
-//
-//            files.push(FileInfo {
-//                filename: file_name,
-//                size: entry.metadata().unwrap().len(),
-//                created_at: created_at.to_rfc3339(),
-//            });
-//        }
-//    }
-//
-//    // sort files by filename, cuz prefix of filename is timestamp
-//    // descending order
-//    files.sort_by(|a, b| b.filename.cmp(&a.filename));
-//
-//    HttpResponse::Ok().json(files.iter().skip(request.page * request.limit).take(request.limit).collect::<Vec<&FileInfo>>())
-//}
 
 async fn download_file(req: HttpRequest, path: web::Path<String>) -> impl Responder {
     let filepath = format!("{}/{}", UPLOAD_DIR, path.into_inner());
@@ -137,9 +139,7 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
     args.push(query.filename.clone());
     args.push(UPLOAD_DIR.to_string());
 
-    let output = Command::new("fd")
-        .args(args)
-        .output();
+    let output = Command::new("fd").args(args).output();
 
     if let Ok(out) = output {
         let stdout = String::from_utf8_lossy(&out.stdout);
@@ -156,12 +156,18 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
                 });
             }
         }
-        
+
         // sort files by filename, cuz prefix of filename is timestamp
         // descending order
         file_infos.sort_by(|a, b| b.filename.cmp(&a.filename));
 
-        HttpResponse::Ok().json(file_infos.iter().skip(query.page * query.limit).take(query.limit).collect::<Vec<&FileInfo>>())
+        HttpResponse::Ok().json(
+            file_infos
+                .iter()
+                .skip(query.page * query.limit)
+                .take(query.limit)
+                .collect::<Vec<&FileInfo>>(),
+        )
     } else {
         HttpResponse::NotFound().body("File not found.")
     }
@@ -193,14 +199,27 @@ async fn main() -> std::io::Result<()> {
             )
             .route("/", web::get().to(index))
             .route("/api/upload", web::post().to(upload_file))
+            .route("/api/upload-binary", web::post().to(upload_file_binary))
             .route("/api/download/{filename}", web::get().to(download_file))
             .route("/api/search", web::post().to(search_files))
-            .route("/api/v1/clipboard/{room_id}/store", web::post().to(api::v1::clipboard::clipboard::store_clipboard))
-            .route("/api/v1/clipboard/keys", web::get().to(api::v1::clipboard::clipboard::get_clipboard_keys))
-            .route("/api/v1/clipboard/{room_id}/get", web::get().to(api::v1::clipboard::clipboard::get_clipboard))
+            .route(
+                "/api/v1/clipboard/{room_id}/store",
+                web::post().to(api::v1::clipboard::clipboard::store_clipboard),
+            )
+            .route(
+                "/api/v1/clipboard/keys",
+                web::get().to(api::v1::clipboard::clipboard::get_clipboard_keys),
+            )
+            .route(
+                "/api/v1/clipboard/{room_id}/get",
+                web::get().to(api::v1::clipboard::clipboard::get_clipboard),
+            )
             .route("/ws", web::get().to(ws::ws_handler))
             .app_data(web::Data::new(tx.clone()))
-            .service(web::resource("/ws-broadcast").route(web::get().to(ws::handshake_and_start_broadcast_ws)))
+            .service(
+                web::resource("/ws-broadcast")
+                    .route(web::get().to(ws::handshake_and_start_broadcast_ws)),
+            )
             .service(web::resource("/send").route(web::post().to(ws::send_to_broadcast_ws)))
             // standard middleware
             .wrap(middleware::NormalizePath::trim())
