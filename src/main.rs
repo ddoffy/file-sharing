@@ -20,11 +20,21 @@ pub mod ws;
 
 const UPLOAD_DIR: &str = "./uploads";
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 struct FileInfo {
     filename: String,
     size: u64,
     created_at: String,
+}
+
+impl Clone for FileInfo {
+    fn clone(&self) -> Self {
+        FileInfo {
+            filename: self.filename.clone(),
+            size: self.size,
+            created_at: self.created_at.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -44,6 +54,14 @@ impl Default for SearchQuery {
             limit: 100,
         }
     }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default)]
+struct SearchResult {
+    files: Vec<FileInfo>,
+    total: usize,
+    page: usize,
+    limit: usize,
 }
 
 async fn upload_file(req: HttpRequest, mut payload: Multipart) -> Result<HttpResponse, Error> {
@@ -148,7 +166,7 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
         let mut file_infos = Vec::new();
 
         for file in files {
-            if file.len() > 0 {
+            if !file.is_empty() {
                 let created_at = get_created_at(file);
                 file_infos.push(FileInfo {
                     filename: file.replace(UPLOAD_DIR, "").replace("/", "").to_string(),
@@ -162,12 +180,24 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
         // descending order
         file_infos.sort_by(|a, b| b.filename.cmp(&a.filename));
 
-        HttpResponse::Ok().json(
-            file_infos
+        let total = file_infos.len();
+        let page = query.page;
+        let limit = query.limit;
+        let file_infos = file_infos
                 .iter()
                 .skip(query.page * query.limit)
                 .take(query.limit)
-                .collect::<Vec<&FileInfo>>(),
+                .cloned()
+                .collect();
+
+
+        HttpResponse::Ok().json(
+            SearchResult {
+                files: file_infos,
+                total,
+                page,
+                limit,
+            }
         )
     } else {
         HttpResponse::NotFound().body("File not found.")
@@ -205,15 +235,15 @@ async fn main() -> std::io::Result<()> {
             .route("/api/search", web::post().to(search_files))
             .route(
                 "/api/v1/clipboard/{room_id}/store",
-                web::post().to(api::v1::clipboard::clipboard::store_clipboard),
+                web::post().to(api::v1::clipboard::store_clipboard),
             )
             .route(
                 "/api/v1/clipboard/keys",
-                web::get().to(api::v1::clipboard::clipboard::get_clipboard_keys),
+                web::get().to(api::v1::clipboard::get_clipboard_keys),
             )
             .route(
                 "/api/v1/clipboard/{room_id}/get",
-                web::get().to(api::v1::clipboard::clipboard::get_clipboard),
+                web::get().to(api::v1::clipboard::get_clipboard),
             )
             .route("/ws", web::get().to(ws::ws_handler))
             .app_data(web::Data::new(tx.clone()))
