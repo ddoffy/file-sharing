@@ -72,7 +72,8 @@ async fn upload_file(req: HttpRequest, mut payload: Multipart) -> Result<HttpRes
     while let Ok(Some(mut field)) = payload.try_next().await {
         if let Some(content_disposition) = field.content_disposition() {
             if let Some(filename) = content_disposition.get_filename() {
-                final_filename = format!("{}-{}", Utc::now().timestamp(), filename);
+                let filename = format!("{}-{}", Utc::now().timestamp(), filename);
+                final_filename = filename.clone();
                 let filepath = format!("{}/{}", UPLOAD_DIR, sanitize_filename::sanitize(filename));
                 println!("Saving file to: {}", filepath);
 
@@ -183,17 +184,16 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
         let total = file_infos.len();
         let page = query.page;
         let limit = query.limit;
-        let file_infos = file_infos
-                .iter()
-                .skip(query.page * query.limit)
-                .take(query.limit)
-                .cloned()
-                .collect();
 
 
         HttpResponse::Ok().json(
             SearchResult {
-                files: file_infos,
+                files: file_infos
+                .iter()
+                .skip(query.page * query.limit)
+                .take(query.limit)
+                .cloned()
+                .collect(),
                 total,
                 page,
                 limit,
