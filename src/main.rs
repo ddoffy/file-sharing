@@ -66,9 +66,10 @@ async fn upload_file(req: HttpRequest, mut payload: Multipart) -> Result<HttpRes
         }
     }
 
+    let schema = req.connection_info().scheme().to_string();
     let host = req.connection_info().host().to_string();
 
-    Ok(HttpResponse::Ok().body(format!("{}/api/download/{}", host, final_filename)))
+    Ok(HttpResponse::Ok().body(format!("{}://{}/api/download/{}", schema, host, final_filename)))
 }
 
 // upload file to the server with binary data
