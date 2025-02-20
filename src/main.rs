@@ -51,7 +51,7 @@ impl Default for SearchQuery {
             filename: "".to_string(),
             extensions: None,
             page: 0,
-            limit: 100,
+            limit: 10,
         }
     }
 }
@@ -88,7 +88,10 @@ async fn upload_file(req: HttpRequest, mut payload: Multipart) -> Result<HttpRes
     let schema = req.connection_info().scheme().to_string();
     let host = req.connection_info().host().to_string();
 
-    Ok(HttpResponse::Ok().body(format!("{}://{}/api/download/{}", schema, host, final_filename)))
+    Ok(HttpResponse::Ok().body(format!(
+        "{}://{}/api/download/{}",
+        schema, host, final_filename
+    )))
 }
 
 // upload file to the server with binary data
@@ -105,7 +108,11 @@ async fn upload_file_binary(req: HttpRequest, body: web::Bytes) -> impl Responde
     println!("Headers: {:?}", req.headers());
 
     let filename = format!("{}-{}", Utc::now().timestamp(), filename);
-    let filepath = format!("{}/{}", UPLOAD_DIR, sanitize_filename::sanitize(filename.clone()));
+    let filepath = format!(
+        "{}/{}",
+        UPLOAD_DIR,
+        sanitize_filename::sanitize(filename.clone())
+    );
     println!("Saving file to: {}", filepath);
 
     // Create directory if not exists
@@ -116,7 +123,7 @@ async fn upload_file_binary(req: HttpRequest, body: web::Bytes) -> impl Responde
 
     // return url to download the file
     let host = req.connection_info().host().to_string();
-    HttpResponse::Ok().body(format!("{}/api/download/{}",host, filename))
+    HttpResponse::Ok().body(format!("{}/api/download/{}", host, filename))
 }
 
 fn get_created_at(file: &str) -> String {
@@ -185,20 +192,17 @@ async fn search_files(query: web::Json<SearchQuery>) -> impl Responder {
         let page = query.page;
         let limit = query.limit;
 
-
-        HttpResponse::Ok().json(
-            SearchResult {
-                files: file_infos
+        HttpResponse::Ok().json(SearchResult {
+            files: file_infos
                 .iter()
                 .skip(query.page * query.limit)
                 .take(query.limit)
                 .cloned()
                 .collect(),
-                total,
-                page,
-                limit,
-            }
-        )
+            total,
+            page,
+            limit,
+        })
     } else {
         HttpResponse::NotFound().body("File not found.")
     }
