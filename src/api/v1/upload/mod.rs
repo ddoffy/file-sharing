@@ -1,12 +1,11 @@
 use actix_web::{web, Responder};
 use base64::engine::general_purpose;
 use base64::Engine;
+use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::fs::OpenOptions;
 use tokio::io::AsyncWriteExt;
-use std::sync::Arc;
 use tokio::sync::Mutex;
-use std::collections::HashMap;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 #[derive(serde::Serialize, serde::Deserialize, Default)]
 pub struct UploadRequest {
@@ -35,28 +34,27 @@ pub async fn upload_file(
         Err(_) => return "Error decoding base64 data".to_string(),
     };
     // add timestamp to filename to prevent overwriting
-    let timestamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_secs();
-    let filename = format!("{}_{}", timestamp, filename);
-
     let mut file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(format!("{}/{}", UPLOAD_DIR, filename))
         .await
         .unwrap();
-    
+
     file.write_all(&data).await.unwrap();
 
     let mut map = file_parts.lock().await;
-    let entry = map.entry(filename.clone()).or_insert(vec![false; total_chunks]);
+    let entry = map
+        .entry(filename.clone())
+        .or_insert(vec![false; total_chunks]);
     entry[chunk_id] = true;
 
     if entry.iter().all(|&received| received) {
         println!("All chunks received for {}", filename);
     }
 
-    format!("Chunk {}/{} received for {}", chunk_id, total_chunks, filename)
+    format!(
+        "Chunk {}/{} received for {}",
+        chunk_id, total_chunks, filename
+    )
 }
