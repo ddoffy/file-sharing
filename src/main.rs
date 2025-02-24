@@ -12,6 +12,10 @@ use std::process::Command;
 use std::time::SystemTime;
 use tokio::fs;
 use tokio::sync::broadcast;
+use api::v1::upload;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 pub mod api;
 pub mod config;
@@ -224,6 +228,8 @@ async fn main() -> std::io::Result<()> {
 
     let (tx, _) = broadcast::channel::<web::Bytes>(128);
 
+    let file_parts_map: upload::FilePartsMap = Arc::new(Mutex::new(HashMap::new()));
+
     HttpServer::new(move || {
         App::new()
             .wrap(
@@ -256,6 +262,11 @@ async fn main() -> std::io::Result<()> {
                     .route(web::get().to(ws::handshake_and_start_broadcast_ws)),
             )
             .service(web::resource("/send").route(web::post().to(ws::send_to_broadcast_ws)))
+            .service(
+                web::resource("/api/v1/upload")
+                    .route(web::post().to(upload::upload_file))
+                    .app_data(web::Data::new(file_parts_map.clone())),
+            )
             // standard middleware
             .wrap(middleware::NormalizePath::trim())
             .wrap(middleware::Logger::default())
